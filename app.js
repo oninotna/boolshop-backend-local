@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const app = express();
-const port = process.env.BACKEND_PORT;
+const port = process.env.PORT;
 
 const clientUrl = process.env.CLIENT_URL;
 
@@ -33,7 +33,7 @@ app.use(errorNotFound);
 // IL SERVER E IN ASCOLTO SULLA PORTA 3000
 
 app.listen(port, (err) => {
-  if(!err){
+  if (!err) {
     console.log("il server è in ascolto sulla porta " + port);
   }
   else {
