@@ -19,6 +19,10 @@ app.use(express.static("public"));
 app.use(express.json());
 //ROUTERS
 
+app.get('/', (req, res) => {
+  res.json({});
+});
+
 app.use("/sneakers", sneakerRouter);
 
 //MIDDLEWARE
@@ -28,6 +32,11 @@ app.use(errorNotFound);
 
 // IL SERVER E IN ASCOLTO SULLA PORTA 3000
 
-app.listen(port, () => {
-  console.log("il server è in ascolto sulla porta " + port);
+app.listen(port, (err) => {
+  if(!err){
+    console.log("il server è in ascolto sulla porta " + port);
+  }
+  else {
+    console.error(err);
+  }
 });
