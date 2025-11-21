@@ -59,7 +59,7 @@ const indexAll = (req, res) => {
       querySearch = `${defaultQuery}  ORDER BY sneakers.price ${orderPriceParam}`;
     }
   }
-  
+
   else if (orderDateParam) {
     if (searchParam) {
       const search = `%${searchParam}%`;
@@ -83,7 +83,7 @@ const indexAll = (req, res) => {
 
     const sneakersWithUrls = sneakersWithImages.map((sneaker) => ({
       ...sneaker,
-      images: sneaker.images.map((img) => `http://localhost:3000/img/${img}`),
+      images: sneaker.images.map((img) => `${process.env.APP_URL}/img/${img}`),
     }));
 
     res.json(sneakersWithUrls);
@@ -125,7 +125,7 @@ const indexLatest = (req, res) => {
         images: sneaker.images
           ? sneaker.images
             .split(",")
-            .map((url) => `http://localhost:3000/img/${url.trim()}`)
+            .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
           : [],
       };
     });
@@ -165,7 +165,7 @@ const latestForHero = (req, res) => {
         images: sneaker.images
           ? sneaker.images
             .split(",")
-            .map((url) => `http://localhost:3000/img/${url.trim()}`)
+            .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
           : [],
       };
     });
@@ -216,7 +216,7 @@ const indexCheapest = (req, res) => {
 
     //   return {
     //     ...sneaker,
-    //     images: images.map((url) => `http://localhost:3000/img/${url}`),
+    //     images: images.map((url) => `${process.env.APP_URL}/img/${url}`),
     //   };
     // });
 
@@ -226,7 +226,7 @@ const indexCheapest = (req, res) => {
         images: sneaker.images
           ? sneaker.images
             .split(",")
-            .map((url) => `http://localhost:3000/img/${url.trim()}`)
+            .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
           : [],
       };
     });
@@ -301,13 +301,13 @@ const show = (req, res) => {
               .status(500)
               .json({ error: "Errore nella query al database" });
 
-          // ➕ Aggiunge http://localhost:3000/img/ a ogni URL delle correlate
+          // ➕ Aggiunge ${process.env.APP_URL}/img/ a ogni URL delle correlate
           const processedRelatedSneakers = relatedSneakersResults.map(
             (sneaker) => {
               const urls = sneaker.images
                 ? sneaker.images
                   .split(",")
-                  .map((url) => `http://localhost:3000/img/${url}`)
+                  .map((url) => `${process.env.APP_URL}/img/${url}`)
                 : [];
 
               // Rimuovi campo originale se vuoi (opzionale)
@@ -320,11 +320,11 @@ const show = (req, res) => {
             }
           );
 
-          // ➕ Aggiunge http://localhost:3000/img/ anche alle immagini della sneaker corrente
+          // ➕ Aggiunge ${process.env.APP_URL}/img/ anche alle immagini della sneaker corrente
           const sneaker = {
             ...currentSneaker,
             images: imagesResults.map(
-              (img) => `http://localhost:3000/img/${img.url}`
+              (img) => `${process.env.APP_URL}/img/${img.url}`
             ),
             related: processedRelatedSneakers,
           };
