@@ -14,7 +14,7 @@ const errorNotFound = require("./middleware/errorNotFound.js");
 
 //STATIC ASSEST
 
-app.use(cors({ origin: clientUrl }));
+app.use(cors({ origin: '*' }));
 app.use(express.static("public"));
 app.use(express.json());
 //ROUTERS
