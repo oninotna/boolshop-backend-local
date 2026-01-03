@@ -1,5 +1,4 @@
 // const connection = require("../data/db.js");
-// const pool = require("../data/db.js");
 // const { sendEmail } = require("../services/emailService.js");
 
 // // INDEX TUTTE LE SCARPE
@@ -602,13 +601,11 @@
 
 // ! --------------------------------------------------------------------------------------
 
-const pool = require("../data/db.js");
+const pool = require("../data/db.js"); // ora è il pool
 const { sendEmail } = require("../services/emailService.js");
 
-/* =========================
-   INDEX TUTTE LE SCARPE
-========================= */
-const indexAll = async (req, res, next) => {
+// INDEX TUTTE LE SCARPE
+const indexAll = async (req, res) => {
   try {
     const searchParam = req.query.search;
     const orderNameParam = req.query.name;
@@ -633,43 +630,64 @@ const indexAll = async (req, res, next) => {
       FROM sneakers
     `;
 
-    let query = defaultQuery;
-    let params = [];
+    let querySearch = defaultQuery;
+    let queryParams = [];
 
     if (searchParam) {
-      query += ` WHERE brand LIKE ? OR model LIKE ?`;
-      params.push(`%${searchParam}%`, `%${searchParam}%`);
+      const search = `%${searchParam}%`;
+      querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?`;
+      queryParams = [search, search];
     }
 
     if (orderNameParam) {
-      query += ` ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
+      if (searchParam) {
+        const search = `%${searchParam}%`;
+        querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
+        ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
+        queryParams = [search, search];
+      } else {
+        querySearch = `${defaultQuery} ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
+      }
     } else if (orderPriceParam) {
-      query += ` ORDER BY sneakers.price ${orderPriceParam}`;
+      if (searchParam) {
+        const search = `%${searchParam}%`;
+        querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
+        ORDER BY sneakers.price ${orderPriceParam}`;
+        queryParams = [search, search];
+      } else {
+        querySearch = `${defaultQuery} ORDER BY sneakers.price ${orderPriceParam}`;
+      }
     } else if (orderDateParam) {
-      query += ` ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
+      if (searchParam) {
+        const search = `%${searchParam}%`;
+        querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
+        ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
+        queryParams = [search, search];
+      } else {
+        querySearch = `${defaultQuery} ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
+      }
     }
 
-    const [results] = await pool.query(query, params);
+    const [results] = await pool.query(querySearch, queryParams);
 
-    const data = results.map((s) => ({
-      ...s,
-      images: s.images
-        ? s.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
+    const sneakersWithUrls = results.map((sneaker) => ({
+      ...sneaker,
+      images: sneaker.images
+        ? sneaker.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
         : [],
     }));
 
-    res.json(data);
+    res.json(sneakersWithUrls);
   } catch (err) {
-    next(err);
+    console.error(err);
+    res.status(500).json({ error: "Database query failed" });
   }
 };
 
-/* =========================
-   INDEX ULTIMI ARRIVI
-========================= */
-const indexLatest = async (req, res, next) => {
+// INDEX ULTIMI 5 ARRIVI
+const indexLatest = async (req, res) => {
   try {
-    const sql = `
+    const sqlLatestSneaker = ` 
       SELECT DISTINCT sneakers.*,
       (
         SELECT JSON_ARRAYAGG(JSON_OBJECT(
@@ -685,60 +703,56 @@ const indexLatest = async (req, res, next) => {
         WHERE images.id_sneaker = sneakers.id_sneaker
       ) AS images
       FROM sneakers
-      ORDER BY sneakers.date_of_arrival DESC
-      LIMIT 6
+      ORDER BY sneakers.date_of_arrival DESC 
+      LIMIT 6;
     `;
+    const [results] = await pool.query(sqlLatestSneaker);
 
-    const [results] = await pool.query(sql);
-
-    const data = results.map((s) => ({
-      ...s,
-      images: s.images
-        ? s.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
+    const sneakersWithImages = results.map((sneaker) => ({
+      ...sneaker,
+      images: sneaker.images
+        ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
         : [],
     }));
 
-    res.json({ results: data });
+    res.json({ results: sneakersWithImages });
   } catch (err) {
-    next(err);
+    console.error(err);
+    res.status(500).json({ error: "Errore nella query al database" });
   }
 };
 
-/* =========================
-   HERO
-========================= */
-const latestForHero = async (req, res, next) => {
+// SHOW ULTIMO ARRIVO PER LA HERO
+const latestForHero = async (req, res) => {
   try {
-    const sql = `
-      SELECT s.*, GROUP_CONCAT(i.url) AS images
+    const sqlLatestSneakerForHero = `
+      SELECT s.*, GROUP_CONCAT(i.url ORDER BY i.id_image ASC) AS images
       FROM sneakers s
       JOIN images i ON s.id_sneaker = i.id_sneaker
       GROUP BY s.id_sneaker
       ORDER BY s.date_of_arrival DESC
-      LIMIT 1
+      LIMIT 1;
     `;
+    const [results] = await pool.query(sqlLatestSneakerForHero);
 
-    const [results] = await pool.query(sql);
-
-    const data = results.map((s) => ({
-      ...s,
-      images: s.images
-        ? s.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
+    const sneakerWithImages = results.map((sneaker) => ({
+      ...sneaker,
+      images: sneaker.images
+        ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
         : [],
     }));
 
-    res.json({ results: data });
+    res.json({ results: sneakerWithImages });
   } catch (err) {
-    next(err);
+    console.error(err);
+    res.status(500).json({ error: "Errore nella query al database" });
   }
 };
 
-/* =========================
-   PIÙ ECONOMICHE
-========================= */
-const indexCheapest = async (req, res, next) => {
+// INDEX 5 SCARPE ECONOMICHE
+const indexCheapest = async (req, res) => {
   try {
-    const sql = `
+    const sqlCheapestSneaker = `
       SELECT DISTINCT sneakers.*,
       (
         SELECT JSON_ARRAYAGG(JSON_OBJECT(
@@ -755,152 +769,102 @@ const indexCheapest = async (req, res, next) => {
       ) AS images
       FROM sneakers
       ORDER BY sneakers.price ASC
-      LIMIT 6
+      LIMIT 6;
     `;
+    const [results] = await pool.query(sqlCheapestSneaker);
 
-    const [results] = await pool.query(sql);
-
-    const data = results.map((s) => ({
-      ...s,
-      images: s.images
-        ? s.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
+    const sneakersWithImages = results.map((sneaker) => ({
+      ...sneaker,
+      images: sneaker.images
+        ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
         : [],
     }));
 
-    res.json({ results: data });
+    res.json({ results: sneakersWithImages });
   } catch (err) {
-    next(err);
+    console.error(err);
+    res.status(500).json({ error: "Errore nella query al database" });
   }
 };
 
-/* =========================
-   SHOW
-========================= */
-const show = async (req, res, next) => {
+// SHOW SINGOLA SNEAKER
+const show = async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const slug = decodeURIComponent(req.params.slug);
 
-    const [current] = await conn.query(
-      `
+    const sqlCurrentSneaker = `
       SELECT sneakers.*,
       JSON_ARRAYAGG(JSON_OBJECT(
         'size', sizes.size,
         'id_size', sizes.id_size
       )) AS sizes
       FROM sneakers
-      JOIN sizes ON sneakers.id_sneaker = sizes.id_sneaker
+      INNER JOIN sizes ON sneakers.id_sneaker = sizes.id_sneaker
       WHERE sneakers.slug = ?
       GROUP BY sneakers.id_sneaker
-      `,
-      [slug]
-    );
+    `;
+    const sqlImages = "SELECT url FROM images WHERE id_sneaker = ?";
+    const sqlRelatedSneakers = `
+      SELECT sneakers.*,
+      (SELECT GROUP_CONCAT(images.url) FROM images WHERE images.id_sneaker = sneakers.id_sneaker) AS images,
+      (SELECT JSON_ARRAYAGG(JSON_OBJECT('size', sizes.size,'id_size', sizes.id_size)) FROM sizes WHERE sizes.id_sneaker = sneakers.id_sneaker) AS sizes
+      FROM sneakers
+      WHERE sneakers.brand = ? AND sneakers.slug != ?
+      GROUP BY sneakers.id_sneaker
+      LIMIT 6;
+    `;
 
-    if (!current.length) {
-      conn.release();
-      return res.status(404).json({ error: "Sneaker non trovata" });
-    }
+    const [currentSneakerResults] = await conn.query(sqlCurrentSneaker, [slug]);
+    if (!currentSneakerResults.length) return res.status(404).json({ error: "Sneaker non trovata" });
 
-    const sneaker = current[0];
+    const currentSneaker = currentSneakerResults[0];
+    const [imagesResults] = await conn.query(sqlImages, [currentSneaker.id_sneaker]);
+    const [relatedSneakersResults] = await conn.query(sqlRelatedSneakers, [currentSneaker.brand, slug]);
 
-    const [[images], [related]] = await Promise.all([
-      conn.query("SELECT url FROM images WHERE id_sneaker = ?", [sneaker.id_sneaker]),
-      conn.query(
-        `
-        SELECT sneakers.*,
-        (
-          SELECT GROUP_CONCAT(images.url)
-          FROM images
-          WHERE images.id_sneaker = sneakers.id_sneaker
-        ) AS images
-        FROM sneakers
-        WHERE brand = ? AND slug != ?
-        LIMIT 6
-        `,
-        [sneaker.brand, slug]
-      ),
-    ]);
+    const processedRelatedSneakers = relatedSneakersResults.map((sneaker) => {
+      const urls = sneaker.images ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url}`) : [];
+      delete sneaker.images;
+      return { ...sneaker, images: urls };
+    });
 
-    sneaker.images = images.map((i) => `${process.env.APP_URL}/img/${i.url}`);
-    sneaker.related = related.map((r) => ({
-      ...r,
-      images: r.images
-        ? r.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
-        : [],
-    }));
+    const sneaker = {
+      ...currentSneaker,
+      images: imagesResults.map((i) => `${process.env.APP_URL}/img/${i.url}`),
+      related: processedRelatedSneakers,
+    };
 
     res.json({ sneaker });
   } catch (err) {
-    next(err);
+    console.error(err);
+    res.status(500).json({ error: "Errore nella query al database" });
   } finally {
     conn.release();
   }
 };
 
-/* =========================
-   CHECKOUT (TRANSAZIONE)
-========================= */
-const postCheckOut = async (req, res, next) => {
-  const conn = await pool.getConnection();
+// POST POPUP (stessa logica, solo pool)
+const postPopUp = async (req, res) => {
   try {
-    await conn.beginTransaction();
+    const { name, surname, email } = req.body;
+    let errors = [];
 
-    const { name, surname, address, phone, email, items } = req.body;
+    if (!name || typeof name !== "string" || name.length < 2 || name.length > 50)
+      errors.push({ message: "Errore sul campo nome" });
+    if (!surname || typeof surname !== "string" || surname.length < 2 || surname.length > 50)
+      errors.push({ message: "Errore sul campo cognome" });
+    if (!email || typeof email !== "string" || email.length < 2 || email.length > 50)
+      errors.push({ message: "Errore sul campo email" });
+    if (errors.length) return res.status(400).json(errors);
 
-    const [userResult] = await conn.query(
-      `INSERT INTO data_checkout (name, surname, address, phone, email)
-       VALUES (?, ?, ?, ?, ?)`,
-      [name, surname, address, phone, email]
-    );
+    const queryPopUp = `INSERT INTO data_popup (name,surname,email) VALUES(?, ?, ?)`;
+    await pool.query(queryPopUp, [name, surname, email]);
+    res.status(201).json({ message: "Dati ricevuti correttamente" });
 
-    const checkoutId = userResult.insertId;
-
-    const sizeIds = items.map((i) => i.id_size);
-    const placeholders = sizeIds.map(() => "?").join(",");
-
-    const [prices] = await conn.query(
-      `
-      SELECT sizes.id_size, sneakers.price
-      FROM sizes
-      JOIN sneakers ON sizes.id_sneaker = sneakers.id_sneaker
-      WHERE sizes.id_size IN (${placeholders})
-      `,
-      sizeIds
-    );
-
-    let total = 0;
-    prices.forEach((p) => {
-      const qty = items.find((i) => i.id_size === p.id_size).quantity;
-      total += p.price * qty;
-    });
-
-    const [orderResult] = await conn.query(
-      `INSERT INTO orders (id_data_checkout, total_price) VALUES (?, ?)`,
-      [checkoutId, total]
-    );
-
-    const orderId = orderResult.insertId;
-    const orderItems = items.map((i) => [i.id_size, orderId, i.quantity]);
-
-    await conn.query(
-      `INSERT INTO order_size (id_size, id_order, quantity) VALUES ?`,
-      [orderItems]
-    );
-
-    await conn.commit();
-
-    sendEmail(email, "Conferma ordine", "Grazie!", `<h2>Totale: €${total}</h2>`);
-
-    res.status(201).json({
-      message: "Ordine completato",
-      orderId,
-      total,
-    });
+    sendEmail(email, `Benvenuto in Boolshop ${name}!`, "Test", `<h2>Ciao ${name} ${surname}!</h2>`);
   } catch (err) {
-    await conn.rollback();
-    next(err);
-  } finally {
-    conn.release();
+    console.error(err);
+    res.status(500).json({ error: "Errore server popup" });
   }
 };
 
@@ -910,5 +874,6 @@ module.exports = {
   latestForHero,
   indexCheapest,
   show,
-  postCheckOut,
+  postPopUp,
 };
+
