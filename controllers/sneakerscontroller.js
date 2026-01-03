@@ -1,871 +1,592 @@
-// const connection = require("../data/db.js");
-// const { sendEmail } = require("../services/emailService.js");
-
-// // INDEX TUTTE LE SCARPE
-
-// const indexAll = (req, res) => {
-//   const searchParam = req.query.search;
-//   const orderNameParam = req.query.name;
-//   const orderPriceParam = req.query.price;
-//   const orderDateParam = req.query.date;
-
-//   const defaultQuery = `
-//    SELECT DISTINCT sneakers.*,
-//   (
-//   SELECT JSON_ARRAYAGG(JSON_OBJECT(
-//       'size', sizes.size,
-//       'id_size', sizes.id_size
-//     ))
-//     FROM sizes 
-//     WHERE sizes.id_sneaker = sneakers.id_sneaker
-//     ) AS sizes,
-//   (
-//   SELECT GROUP_CONCAT(images.url)  
-//   FROM images
-//   WHERE images.id_sneaker = sneakers.id_sneaker
-//   ) AS images
-//   FROM sneakers`;
-
-//   let querySearch = defaultQuery;
-//   let queryParams = [];
-
-//   if (searchParam) {
-//     const search = `%${searchParam}%`;
-//     querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?`;
-//     queryParams = [search, search];
-//   }
-
-//   if (orderNameParam) {
-//     if (searchParam) {
-//       const search = `%${searchParam}%`;
-//       querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?
-//       ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
-//       queryParams = [search, search];
-//     }
-//     else {
-//       querySearch = `${defaultQuery}  ORDER BY sneakers.brand ${orderNameParam}, 
-//       sneakers.model ${orderNameParam}`;
-//     }
-//   }
-
-//   else if (orderPriceParam) {
-//     if (searchParam) {
-//       const search = `%${searchParam}%`;
-//       querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?
-//       ORDER BY sneakers.price ${orderPriceParam}`;
-//       queryParams = [search, search];
-//     }
-//     else {
-//       querySearch = `${defaultQuery}  ORDER BY sneakers.price ${orderPriceParam}`;
-//     }
-//   }
-
-//   else if (orderDateParam) {
-//     if (searchParam) {
-//       const search = `%${searchParam}%`;
-//       querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?
-//       ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
-//       queryParams = [search, search];
-//     }
-//     else {
-//       querySearch = `${defaultQuery}  ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
-//     }
-//   }
-
-
-//   connection.query(querySearch, queryParams, (err, results) => {
-//     if (err) return res.status(500).json({ error: "Database query failed" });
-
-//     const sneakersWithImages = results.map((sneaker) => ({
-//       ...sneaker,
-//       images: sneaker.images ? sneaker.images.split(",") : [],
-//     }));
-
-//     const sneakersWithUrls = sneakersWithImages.map((sneaker) => ({
-//       ...sneaker,
-//       images: sneaker.images.map((img) => `${process.env.APP_URL}/img/${img}`),
-//     }));
-
-//     res.json(sneakersWithUrls);
-//   });
-// };
-
-// // INDEX ULTIMI 5 ARRIVI
-
-// const indexLatest = (req, res) => {
-//   const sqlLatestSneaker = ` 
-//   SELECT DISTINCT sneakers.*,
-//   (
-//   SELECT JSON_ARRAYAGG(JSON_OBJECT(
-//       'size', sizes.size,
-//       'id_size', sizes.id_size
-//     ))
-//     FROM sizes 
-//     WHERE sizes.id_sneaker = sneakers.id_sneaker
-//     ) AS sizes,
-//   (
-//   SELECT GROUP_CONCAT(images.url)  
-//   FROM images
-//   WHERE images.id_sneaker = sneakers.id_sneaker
-//   ) AS images
-//   FROM sneakers
-//     ORDER BY 
-//       sneakers.date_of_arrival DESC 
-//     LIMIT 6;`;
-//   connection.query(sqlLatestSneaker, (err, results) => {
-//     if (err) {
-//       console.error("Errore nella query al database:", err); // Logga l'errore per il debugging
-//       return res.status(500).json({ error: "Errore nella query al database" });
-//     }
-
-//     // Elabora i risultati per trasformare la stringa di image_urls separata da virgole in un array
-//     const sneakersWithImages = results.map((sneaker) => {
-//       return {
-//         ...sneaker,
-//         images: sneaker.images
-//           ? sneaker.images
-//             .split(",")
-//             .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
-//           : [],
-//       };
-//     });
-
-//     res.json({
-//       results: sneakersWithImages,
-//     });
-//   });
-// };
-// // SHOW ULTIMO ARRIVO PER LA HERO
-
-// const latestForHero = (req, res) => {
-//   const sqlLatestSneakerForHero = `
-//     SELECT 
-//       s.*, 
-//       GROUP_CONCAT(i.url ORDER BY i.id_image ASC) AS images
-//     FROM 
-//       sneakers s
-//     JOIN 
-//       images i ON s.id_sneaker = i.id_sneaker
-//     GROUP BY
-//       s.id_sneaker
-//     ORDER BY 
-//       s.date_of_arrival DESC 
-//     LIMIT 1;
-//   `;
-
-//   connection.query(sqlLatestSneakerForHero, (err, results) => {
-//     if (err) {
-//       console.error("Errore nella query al database:", err);
-//       return res.status(500).json({ error: "Errore nella query al database" });
-//     }
-
-//     const sneakerWithImages = results.map((sneaker) => {
-//       return {
-//         ...sneaker,
-//         images: sneaker.images
-//           ? sneaker.images
-//             .split(",")
-//             .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
-//           : [],
-//       };
-//     });
-
-//     res.json({
-//       results: sneakerWithImages,
-//     });
-//   });
-// };
-
-// // INDEX 5 SCARPE ECONOMICHE PIU ECONOMICHE
-
-// const indexCheapest = (req, res) => {
-//   const sqlCheapestSneaker = `
-//     SELECT DISTINCT sneakers.*,
-//   (
-//   SELECT JSON_ARRAYAGG(JSON_OBJECT(
-//       'size', sizes.size,
-//       'id_size', sizes.id_size
-//     ))
-//     FROM sizes 
-//     WHERE sizes.id_sneaker = sneakers.id_sneaker
-//     ) AS sizes,
-//   (
-//   SELECT GROUP_CONCAT(images.url)  
-//   FROM images
-//   WHERE images.id_sneaker = sneakers.id_sneaker
-//   ) AS images
-//   FROM sneakers
-//     ORDER BY sneakers.price ASC
-//     LIMIT 6;
-//   `;
-
-//   connection.query(sqlCheapestSneaker, (err, results) => {
-//     if (err) {
-//       console.error("Errore nella query al database:", err);
-//       return res.status(500).json({ error: "Errore nella query al database" });
-//     }
-
-//     // const sneakersWithImages = results.map((sneaker) => {
-//     //   const imageField = Object.keys(sneaker).find((k) =>
-//     //     k.startsWith("GROUP_CONCAT")
-//     //   );
-//     //   const images = sneaker[imageField] ? sneaker[imageField].split(",") : [];
-
-//     //   // Rimuovi il campo GROUP_CONCAT dalla risposta
-//     //   delete sneaker[imageField];
-
-//     //   return {
-//     //     ...sneaker,
-//     //     images: images.map((url) => `${process.env.APP_URL}/img/${url}`),
-//     //   };
-//     // });
-
-//     const sneakersWithImages = results.map((sneaker) => {
-//       return {
-//         ...sneaker,
-//         images: sneaker.images
-//           ? sneaker.images
-//             .split(",")
-//             .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
-//           : [],
-//       };
-//     });
-
-//     res.json({
-//       results: sneakersWithImages,
-//     });
-//   });
-// };
-// const show = (req, res) => {
-//   const slug = decodeURIComponent(req.params.slug);
-
-//   const sqlCurrentSneaker = `
-//   SELECT sneakers.*,
-//   JSON_ARRAYAGG(JSON_OBJECT(
-//       'size', sizes.size,
-//       'id_size', sizes.id_size
-//     )) AS sizes
-//   FROM sneakers
-//   inner join sizes
-//   on sneakers.id_sneaker = sizes.id_sneaker
-//   WHERE sneakers.slug = ?
-//   GROUP BY 
-//   sneakers.id_sneaker`;
-//   const sqlImages = "SELECT url FROM images WHERE id_sneaker = ?";
-//   const sqlRelatedSneakers = `
-//     SELECT 
-//       sneakers.*, 
-//       ( 
-//       SELECT GROUP_CONCAT(images.url) 
-//       FROM images
-//       WHERE images.id_sneaker = sneakers.id_sneaker
-//       ) AS images,
-//       ( 
-//       SELECT JSON_ARRAYAGG(JSON_OBJECT(
-//       'size', sizes.size,
-//       'id_size', sizes.id_size
-//     ))
-//     FROM sizes 
-//     WHERE sizes.id_sneaker = sneakers.id_sneaker
-//     ) AS sizes
-//     FROM sneakers
-//     WHERE sneakers.brand = ? AND sneakers.slug != ?
-//     GROUP BY
-//       sneakers.id_sneaker
-//     LIMIT 6;
-//   `;
-
-//   connection.query(sqlCurrentSneaker, [slug], (err, currentSneakerResults) => {
-//     if (err)
-//       return res.status(500).json({ error: "Errore nella query al database" });
-
-//     if (currentSneakerResults.length === 0)
-//       return res.status(404).json({ error: "Sneaker non trovata" });
-
-//     const currentSneaker = currentSneakerResults[0];
-//     const brand = currentSneaker.brand;
-//     const idSneaker = currentSneaker.id_sneaker;
-
-//     connection.query(sqlImages, [idSneaker], (err, imagesResults) => {
-//       if (err)
-//         return res
-//           .status(500)
-//           .json({ error: "Impossibile recuperare le immagini" });
-
-//       connection.query(
-//         sqlRelatedSneakers,
-//         [brand, slug],
-//         (err, relatedSneakersResults) => {
-//           if (err)
-//             return res
-//               .status(500)
-//               .json({ error: "Errore nella query al database" });
-
-//           // ➕ Aggiunge ${process.env.APP_URL}/img/ a ogni URL delle correlate
-//           const processedRelatedSneakers = relatedSneakersResults.map(
-//             (sneaker) => {
-//               const urls = sneaker.images
-//                 ? sneaker.images
-//                   .split(",")
-//                   .map((url) => `${process.env.APP_URL}/img/${url}`)
-//                 : [];
-
-//               // Rimuovi campo originale se vuoi (opzionale)
-//               delete sneaker.images;
-
-//               return {
-//                 ...sneaker,
-//                 images: urls,
-//               };
-//             }
-//           );
-
-//           // ➕ Aggiunge ${process.env.APP_URL}/img/ anche alle immagini della sneaker corrente
-//           const sneaker = {
-//             ...currentSneaker,
-//             images: imagesResults.map(
-//               (img) => `${process.env.APP_URL}/img/${img.url}`
-//             ),
-//             related: processedRelatedSneakers,
-//           };
-
-//           res.json({ sneaker });
-//         }
-//       );
-//     });
-//   });
-// };
-
-// const postPopUp = (req, res) => {
-//   const { name, surname, email } = req.body;
-
-//   let errors = [];
-
-//   if (!name) {
-//     errors.push({ message: "controlla i dati immessi nel campo nome" });
-//   }
-//   if (name.length < 2) {
-//     errors.push({ message: `il nome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (name.length > 50) {
-//     errors.push({ message: `il nome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (typeof name !== 'string') {
-//     errors.push({ message: "Il campo nome deve essere una stringa" });
-//   }
-
-//   if (!surname) {
-//     errors.push({ message: "controlla i dati immessi nel campo cognome" });
-//   }
-//   if (surname.length < 2) {
-//     errors.push({ message: `il cognome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (surname.length > 50) {
-//     errors.push({ message: `il cognome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (typeof surname !== 'string') {
-//     errors.push({ message: "Il campo cognome deve essere una stringa" });
-//   }
-
-//   if (!email) {
-//     errors.push({ message: "controlla i dati immessi nel campo e-mail" });
-//   }
-//   if (email.length < 2) {
-//     errors.push({ message: `il e-mail non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (email.length > 50) {
-//     errors.push({ message: `il e-mail non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (typeof email !== 'string') {
-//     errors.push({ message: "Il campo e-mail deve essere una stringa" });
-//   }
-//   if (errors.length) {
-//     return res.status(400).json(errors);
-//   }
-
-//   const testSubject = `Benvenuto in Boolshop ${name}!`;
-//   const testText =
-//     "Ciao! Questa è una email di test inviata con successo dal tuo server Node.js.";
-//   const testHtml = `<h2>Ciao ${name} ${surname}!</h2>
-//   <p>Questa è una email di benvenuto al nostro e-commerce</p>`;
-
-//   const queryPopUp = `INSERT INTO data_popup (name,surname,email) VALUES(?, ?, ?)`;
-
-//   connection.query(queryPopUp, [name, surname, email], (err, results) => {
-//     if (err) return res.status(500).json({ message: "Errore del server", err });
-//     res.status(201).json({ message: "Dati ricevuti correttamente" });
-//     console.log(results);
-
-//     sendEmail(email, testSubject, testText, testHtml, (error, info) => {
-//       if (error) {
-//         console.error("ERRORE durante l'invio dell'email di test:", error);
-//       } else {
-//         console.log("Email di test inviata con successo!");
-//         console.log("MessageId:", info.messageId);
-//       }
-//     });
-//   });
-// };
-
-// const postCheckOut = (req, res) => {
-//   const { name, surname, address, phone, email, items } = req.body;
-
-//   let errors = [];
-
-//   if (!name) {
-//     errors.push({ message: "controlla i dati immessi nel campo nome" });
-//   }
-//   if (name.length < 2) {
-//     errors.push({ message: `il nome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (name.length > 50) {
-//     errors.push({ message: `il nome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (typeof name !== 'string') {
-//     errors.push({ message: "Il campo nome deve essere una stringa" });
-//   }
-//   if (surname.length < 2) {
-//     errors.push({ message: `il cognome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (surname.length > 50) {
-//     errors.push({ message: `il cognome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (typeof surname !== 'string') {
-//     errors.push({ message: "Il campo cognome deve essere una stringa" });
-//   }
-//   if (!address)
-//     errors.push({
-//       message: "controlla i dati immessi nel campo dell'indirizzo",
-//     });
-//   if (address.length < 2) {
-//     errors.push({ message: `L'indirizzo non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (address.length > 100) {
-//     errors.push({ message: `L'indirizzo non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
-//   }
-//   if (typeof address !== 'string') {
-//     errors.push({ message: "Il campo dell'indirizzo deve essere una stringa" });
-//   }
-//   if (!phone)
-//     errors.push({ message: "controlla i dati immessi nel campo numero di telefono" });
-//   if (phone.length < 8)
-//     errors.push({ message: `il numero di telefono non può contenere meno di 8 caratteri(numero attuale di caratteri: ${phone.length}` });
-//   if (phone.length > 30)
-//     errors.push({ message: `il numero di telefono non può contenere più di caratteri(numero attuale di caratteri: ${phone.length}` });
-//   if (!/^\+?[0-9]+$/.test(phone)) {
-//     errors.push({ message: "Il campo del numero di telefono può includere solo numeri" });
-//   }
-//   if (!email)
-//     errors.push({ message: "controlla i dati immessi nel campo e-mail" });
-//   if (email.length < 8)
-//     errors.push({ message: `l'email non può contenere meno di 8 caratteri(numero attuale di caratteri: ${email.length}` });
-//   if (email.length > 30)
-//     errors.push({ message: `l'email non può contenere più di caratteri(numero attuale di caratteri: ${email.length}` });
-//   if (!Array.isArray(items) || !items.length) {
-//     errors.push({ message: "Il carrello è vuoto." });
-//   }
-
-//   if (errors.length) return res.status(400).json(errors);
-
-//   const queryDataCheckout = `
-//     INSERT INTO data_checkout (name, surname, address, phone, email)
-//     VALUES (?, ?, ?, ?, ?)
-//   `;
-
-//   connection.query(
-//     queryDataCheckout,
-//     [name, surname, address, phone, email],
-//     (err, result) => {
-//       if (err)
-//         return res
-//           .status(500)
-//           .json({ message: "Errore salvataggio utente", err });
-
-//       const id_data_checkout = result.insertId;
-//       const sizeIds = items.map((item) => item.id_size);
-//       const placeholders = sizeIds.map(() => "?").join(",");
-
-//       const queryPrices = `
-//       SELECT sizes.id_size, sneakers.id_sneaker, sneakers.price
-//       FROM sizes
-//       JOIN sneakers ON sizes.id_sneaker = sneakers.id_sneaker
-//       WHERE sizes.id_size IN (${placeholders})
-//     `;
-
-//       connection.query(queryPrices, sizeIds, (err, priceResults) => {
-//         if (err)
-//           return res
-//             .status(500)
-//             .json({ message: "Errore recupero prezzi", err });
-
-//         const sneakerMap = {};
-//         const sizeToSneaker = {};
-
-//         priceResults.forEach((row) => {
-//           sizeToSneaker[row.id_size] = row.id_sneaker;
-//           sneakerMap[row.id_sneaker] = row.price;
-//         });
-
-//         let total_price = parseInt(0);
-
-//         items.forEach((item) => {
-//           const id_sneaker = sizeToSneaker[item.id_size];
-//           const itemPrice = sneakerMap[id_sneaker];
-//           total_price += itemPrice * item.quantity;
-//         });
-
-//         const queryOrder = `
-//         INSERT INTO orders (id_data_checkout, total_price)
-//         VALUES (?, ?)
-//       `;
-
-//         connection.query(
-//           queryOrder,
-//           [id_data_checkout, total_price],
-//           (err, result) => {
-//             if (err)
-//               return res
-//                 .status(500)
-//                 .json({ message: "Errore salvataggio ordine", err });
-
-//             const id_order = result.insertId;
-//             const orderItems = items.map((item) => [
-//               item.id_size,
-//               id_order,
-//               item.quantity,
-//             ]);
-
-//             const queryOrderSize = `
-//           INSERT INTO order_size (id_size, id_order, quantity)
-//           VALUES ?
-//         `;
-//             // email lato e-commerce
-
-//             const itemsHtml = items
-//               .map(
-//                 (item) => `
-//               <p>nome articolo: ${item.model}</p>
-//               <p>taglia articolo: ${item.size}</p>
-//               <p>quantità articolo: ${item.quantity}</p>
-//               <p>prezzo articolo: ${item.price}</p>
-//               <br/>`
-//               )
-//               .join("");
-//             connection.query(queryOrderSize, [orderItems], (err) => {
-//               if (err)
-//                 return res
-//                   .status(500)
-//                   .json({ message: "Errore salvataggio articoli", err });
-//               const subject = "Conferma ordine - bool_shop";
-//               const text = `Grazie per il tuo ordine, ${name} ${surname}!`;
-//               const html = `
-//             <h2>Ordine del cliente ${name} ${surname}</h2>
-//               ${itemsHtml}
-//             <p>Totale ordine: <strong>€${total_price.toFixed(2)}</strong></p> `;
-
-//               // email per il cliente
-
-//               sendEmail(process.env.EMAIL_USER, subject, text, html);
-
-//               const userSubject = "Conferma ordine - bool_shop";
-//               const userText = `Grazie per il tuo ordine, ${name} ${surname}!`;
-//               const userHtml = `
-//             <h2>Ciao ${name} ${surname},</h2>
-//             <p>Grazie per il tuo ordine!</p>
-//             <p> ${itemsHtml}</p>
-//             <p>Totale ordine: <strong>€${total_price.toFixed(2)}</strong></p>`;
-//               sendEmail(email, userSubject, userText, userHtml, () => {
-//                 return res.status(201).json({
-//                   message: "Ordine completato con successo",
-//                   id_order,
-//                   total_price,
-//                 });
-//               });
-//             });
-//           }
-//         );
-//       });
-//     }
-//   );
-// };
-
-// module.exports = {
-//   indexAll,
-//   indexLatest,
-//   latestForHero,
-//   indexCheapest,
-//   show,
-//   postPopUp,
-//   postCheckOut,
-// };
-
-// ! --------------------------------------------------------------------------------------
-
-const pool = require("../data/db.js"); // ora è il pool
+const connection = require("../data/db.js");
 const { sendEmail } = require("../services/emailService.js");
 
 // INDEX TUTTE LE SCARPE
-const indexAll = async (req, res) => {
-  try {
-    const searchParam = req.query.search;
-    const orderNameParam = req.query.name;
-    const orderPriceParam = req.query.price;
-    const orderDateParam = req.query.date;
 
-    const defaultQuery = `
-      SELECT DISTINCT sneakers.*,
-      (
-        SELECT JSON_ARRAYAGG(JSON_OBJECT(
-          'size', sizes.size,
-          'id_size', sizes.id_size
-        ))
-        FROM sizes 
-        WHERE sizes.id_sneaker = sneakers.id_sneaker
-      ) AS sizes,
-      (
-        SELECT GROUP_CONCAT(images.url)  
-        FROM images
-        WHERE images.id_sneaker = sneakers.id_sneaker
-      ) AS images
-      FROM sneakers
-    `;
+const indexAll = (req, res) => {
+  const searchParam = req.query.search;
+  const orderNameParam = req.query.name;
+  const orderPriceParam = req.query.price;
+  const orderDateParam = req.query.date;
 
-    let querySearch = defaultQuery;
-    let queryParams = [];
+  const defaultQuery = `
+   SELECT DISTINCT sneakers.*,
+  (
+  SELECT JSON_ARRAYAGG(JSON_OBJECT(
+      'size', sizes.size,
+      'id_size', sizes.id_size
+    ))
+    FROM sizes 
+    WHERE sizes.id_sneaker = sneakers.id_sneaker
+    ) AS sizes,
+  (
+  SELECT GROUP_CONCAT(images.url)  
+  FROM images
+  WHERE images.id_sneaker = sneakers.id_sneaker
+  ) AS images
+  FROM sneakers`;
 
+  let querySearch = defaultQuery;
+  let queryParams = [];
+
+  if (searchParam) {
+    const search = `%${searchParam}%`;
+    querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?`;
+    queryParams = [search, search];
+  }
+
+  if (orderNameParam) {
     if (searchParam) {
       const search = `%${searchParam}%`;
-      querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?`;
+      querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?
+      ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
       queryParams = [search, search];
     }
-
-    if (orderNameParam) {
-      if (searchParam) {
-        const search = `%${searchParam}%`;
-        querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
-        ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
-        queryParams = [search, search];
-      } else {
-        querySearch = `${defaultQuery} ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
-      }
-    } else if (orderPriceParam) {
-      if (searchParam) {
-        const search = `%${searchParam}%`;
-        querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
-        ORDER BY sneakers.price ${orderPriceParam}`;
-        queryParams = [search, search];
-      } else {
-        querySearch = `${defaultQuery} ORDER BY sneakers.price ${orderPriceParam}`;
-      }
-    } else if (orderDateParam) {
-      if (searchParam) {
-        const search = `%${searchParam}%`;
-        querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
-        ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
-        queryParams = [search, search];
-      } else {
-        querySearch = `${defaultQuery} ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
-      }
+    else {
+      querySearch = `${defaultQuery}  ORDER BY sneakers.brand ${orderNameParam}, 
+      sneakers.model ${orderNameParam}`;
     }
+  }
 
-    const [results] = await pool.query(querySearch, queryParams);
+  else if (orderPriceParam) {
+    if (searchParam) {
+      const search = `%${searchParam}%`;
+      querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?
+      ORDER BY sneakers.price ${orderPriceParam}`;
+      queryParams = [search, search];
+    }
+    else {
+      querySearch = `${defaultQuery}  ORDER BY sneakers.price ${orderPriceParam}`;
+    }
+  }
 
-    const sneakersWithUrls = results.map((sneaker) => ({
+  else if (orderDateParam) {
+    if (searchParam) {
+      const search = `%${searchParam}%`;
+      querySearch = `${defaultQuery}  WHERE brand LIKE ? OR model LIKE ?
+      ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
+      queryParams = [search, search];
+    }
+    else {
+      querySearch = `${defaultQuery}  ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
+    }
+  }
+
+
+  connection.query(querySearch, queryParams, (err, results) => {
+    if (err) return res.status(500).json({ error: "Database query failed" });
+
+    const sneakersWithImages = results.map((sneaker) => ({
       ...sneaker,
-      images: sneaker.images
-        ? sneaker.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
-        : [],
+      images: sneaker.images ? sneaker.images.split(",") : [],
+    }));
+
+    const sneakersWithUrls = sneakersWithImages.map((sneaker) => ({
+      ...sneaker,
+      images: sneaker.images.map((img) => `${process.env.APP_URL}/img/${img}`),
     }));
 
     res.json(sneakersWithUrls);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database query failed" });
-  }
+  });
 };
 
 // INDEX ULTIMI 5 ARRIVI
-const indexLatest = async (req, res) => {
-  try {
-    const sqlLatestSneaker = ` 
-      SELECT DISTINCT sneakers.*,
-      (
-        SELECT JSON_ARRAYAGG(JSON_OBJECT(
-          'size', sizes.size,
-          'id_size', sizes.id_size
-        ))
-        FROM sizes 
-        WHERE sizes.id_sneaker = sneakers.id_sneaker
-      ) AS sizes,
-      (
-        SELECT GROUP_CONCAT(images.url)  
-        FROM images
-        WHERE images.id_sneaker = sneakers.id_sneaker
-      ) AS images
-      FROM sneakers
-      ORDER BY sneakers.date_of_arrival DESC 
-      LIMIT 6;
-    `;
-    const [results] = await pool.query(sqlLatestSneaker);
 
-    const sneakersWithImages = results.map((sneaker) => ({
-      ...sneaker,
-      images: sneaker.images
-        ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
-        : [],
-    }));
+const indexLatest = (req, res) => {
+  const sqlLatestSneaker = ` 
+  SELECT DISTINCT sneakers.*,
+  (
+  SELECT JSON_ARRAYAGG(JSON_OBJECT(
+      'size', sizes.size,
+      'id_size', sizes.id_size
+    ))
+    FROM sizes 
+    WHERE sizes.id_sneaker = sneakers.id_sneaker
+    ) AS sizes,
+  (
+  SELECT GROUP_CONCAT(images.url)  
+  FROM images
+  WHERE images.id_sneaker = sneakers.id_sneaker
+  ) AS images
+  FROM sneakers
+    ORDER BY 
+      sneakers.date_of_arrival DESC 
+    LIMIT 6;`;
+  connection.query(sqlLatestSneaker, (err, results) => {
+    if (err) {
+      console.error("Errore nella query al database:", err); // Logga l'errore per il debugging
+      return res.status(500).json({ error: "Errore nella query al database" });
+    }
 
-    res.json({ results: sneakersWithImages });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Errore nella query al database" });
-  }
-};
-
-// SHOW ULTIMO ARRIVO PER LA HERO
-const latestForHero = async (req, res) => {
-  try {
-    const sqlLatestSneakerForHero = `
-      SELECT s.*, GROUP_CONCAT(i.url ORDER BY i.id_image ASC) AS images
-      FROM sneakers s
-      JOIN images i ON s.id_sneaker = i.id_sneaker
-      GROUP BY s.id_sneaker
-      ORDER BY s.date_of_arrival DESC
-      LIMIT 1;
-    `;
-    const [results] = await pool.query(sqlLatestSneakerForHero);
-
-    const sneakerWithImages = results.map((sneaker) => ({
-      ...sneaker,
-      images: sneaker.images
-        ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
-        : [],
-    }));
-
-    res.json({ results: sneakerWithImages });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Errore nella query al database" });
-  }
-};
-
-// INDEX 5 SCARPE ECONOMICHE
-const indexCheapest = async (req, res) => {
-  try {
-    const sqlCheapestSneaker = `
-      SELECT DISTINCT sneakers.*,
-      (
-        SELECT JSON_ARRAYAGG(JSON_OBJECT(
-          'size', sizes.size,
-          'id_size', sizes.id_size
-        ))
-        FROM sizes 
-        WHERE sizes.id_sneaker = sneakers.id_sneaker
-      ) AS sizes,
-      (
-        SELECT GROUP_CONCAT(images.url)  
-        FROM images
-        WHERE images.id_sneaker = sneakers.id_sneaker
-      ) AS images
-      FROM sneakers
-      ORDER BY sneakers.price ASC
-      LIMIT 6;
-    `;
-    const [results] = await pool.query(sqlCheapestSneaker);
-
-    const sneakersWithImages = results.map((sneaker) => ({
-      ...sneaker,
-      images: sneaker.images
-        ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
-        : [],
-    }));
-
-    res.json({ results: sneakersWithImages });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Errore nella query al database" });
-  }
-};
-
-// SHOW SINGOLA SNEAKER
-const show = async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    const slug = decodeURIComponent(req.params.slug);
-
-    const sqlCurrentSneaker = `
-      SELECT sneakers.*,
-      JSON_ARRAYAGG(JSON_OBJECT(
-        'size', sizes.size,
-        'id_size', sizes.id_size
-      )) AS sizes
-      FROM sneakers
-      INNER JOIN sizes ON sneakers.id_sneaker = sizes.id_sneaker
-      WHERE sneakers.slug = ?
-      GROUP BY sneakers.id_sneaker
-    `;
-    const sqlImages = "SELECT url FROM images WHERE id_sneaker = ?";
-    const sqlRelatedSneakers = `
-      SELECT sneakers.*,
-      (SELECT GROUP_CONCAT(images.url) FROM images WHERE images.id_sneaker = sneakers.id_sneaker) AS images,
-      (SELECT JSON_ARRAYAGG(JSON_OBJECT('size', sizes.size,'id_size', sizes.id_size)) FROM sizes WHERE sizes.id_sneaker = sneakers.id_sneaker) AS sizes
-      FROM sneakers
-      WHERE sneakers.brand = ? AND sneakers.slug != ?
-      GROUP BY sneakers.id_sneaker
-      LIMIT 6;
-    `;
-
-    const [currentSneakerResults] = await conn.query(sqlCurrentSneaker, [slug]);
-    if (!currentSneakerResults.length) return res.status(404).json({ error: "Sneaker non trovata" });
-
-    const currentSneaker = currentSneakerResults[0];
-    const [imagesResults] = await conn.query(sqlImages, [currentSneaker.id_sneaker]);
-    const [relatedSneakersResults] = await conn.query(sqlRelatedSneakers, [currentSneaker.brand, slug]);
-
-    const processedRelatedSneakers = relatedSneakersResults.map((sneaker) => {
-      const urls = sneaker.images ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url}`) : [];
-      delete sneaker.images;
-      return { ...sneaker, images: urls };
+    // Elabora i risultati per trasformare la stringa di image_urls separata da virgole in un array
+    const sneakersWithImages = results.map((sneaker) => {
+      return {
+        ...sneaker,
+        images: sneaker.images
+          ? sneaker.images
+            .split(",")
+            .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
+          : [],
+      };
     });
 
-    const sneaker = {
-      ...currentSneaker,
-      images: imagesResults.map((i) => `${process.env.APP_URL}/img/${i.url}`),
-      related: processedRelatedSneakers,
-    };
+    res.json({
+      results: sneakersWithImages,
+    });
+  });
+};
+// SHOW ULTIMO ARRIVO PER LA HERO
 
-    res.json({ sneaker });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Errore nella query al database" });
-  } finally {
-    conn.release();
-  }
+const latestForHero = (req, res) => {
+  const sqlLatestSneakerForHero = `
+    SELECT 
+      s.*, 
+      GROUP_CONCAT(i.url ORDER BY i.id_image ASC) AS images
+    FROM 
+      sneakers s
+    JOIN 
+      images i ON s.id_sneaker = i.id_sneaker
+    GROUP BY
+      s.id_sneaker
+    ORDER BY 
+      s.date_of_arrival DESC 
+    LIMIT 1;
+  `;
+
+  connection.query(sqlLatestSneakerForHero, (err, results) => {
+    if (err) {
+      console.error("Errore nella query al database:", err);
+      return res.status(500).json({ error: "Errore nella query al database" });
+    }
+
+    const sneakerWithImages = results.map((sneaker) => {
+      return {
+        ...sneaker,
+        images: sneaker.images
+          ? sneaker.images
+            .split(",")
+            .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
+          : [],
+      };
+    });
+
+    res.json({
+      results: sneakerWithImages,
+    });
+  });
 };
 
-// POST POPUP (stessa logica, solo pool)
-const postPopUp = async (req, res) => {
-  try {
-    const { name, surname, email } = req.body;
-    let errors = [];
+// INDEX 5 SCARPE ECONOMICHE PIU ECONOMICHE
 
-    if (!name || typeof name !== "string" || name.length < 2 || name.length > 50)
-      errors.push({ message: "Errore sul campo nome" });
-    if (!surname || typeof surname !== "string" || surname.length < 2 || surname.length > 50)
-      errors.push({ message: "Errore sul campo cognome" });
-    if (!email || typeof email !== "string" || email.length < 2 || email.length > 50)
-      errors.push({ message: "Errore sul campo email" });
-    if (errors.length) return res.status(400).json(errors);
+const indexCheapest = (req, res) => {
+  const sqlCheapestSneaker = `
+    SELECT DISTINCT sneakers.*,
+  (
+  SELECT JSON_ARRAYAGG(JSON_OBJECT(
+      'size', sizes.size,
+      'id_size', sizes.id_size
+    ))
+    FROM sizes 
+    WHERE sizes.id_sneaker = sneakers.id_sneaker
+    ) AS sizes,
+  (
+  SELECT GROUP_CONCAT(images.url)  
+  FROM images
+  WHERE images.id_sneaker = sneakers.id_sneaker
+  ) AS images
+  FROM sneakers
+    ORDER BY sneakers.price ASC
+    LIMIT 6;
+  `;
 
-    const queryPopUp = `INSERT INTO data_popup (name,surname,email) VALUES(?, ?, ?)`;
-    await pool.query(queryPopUp, [name, surname, email]);
-    res.status(201).json({ message: "Dati ricevuti correttamente" });
+  connection.query(sqlCheapestSneaker, (err, results) => {
+    if (err) {
+      console.error("Errore nella query al database:", err);
+      return res.status(500).json({ error: "Errore nella query al database" });
+    }
 
-    sendEmail(email, `Benvenuto in Boolshop ${name}!`, "Test", `<h2>Ciao ${name} ${surname}!</h2>`);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Errore server popup" });
+    // const sneakersWithImages = results.map((sneaker) => {
+    //   const imageField = Object.keys(sneaker).find((k) =>
+    //     k.startsWith("GROUP_CONCAT")
+    //   );
+    //   const images = sneaker[imageField] ? sneaker[imageField].split(",") : [];
+
+    //   // Rimuovi il campo GROUP_CONCAT dalla risposta
+    //   delete sneaker[imageField];
+
+    //   return {
+    //     ...sneaker,
+    //     images: images.map((url) => `${process.env.APP_URL}/img/${url}`),
+    //   };
+    // });
+
+    const sneakersWithImages = results.map((sneaker) => {
+      return {
+        ...sneaker,
+        images: sneaker.images
+          ? sneaker.images
+            .split(",")
+            .map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
+          : [],
+      };
+    });
+
+    res.json({
+      results: sneakersWithImages,
+    });
+  });
+};
+const show = (req, res) => {
+  const slug = decodeURIComponent(req.params.slug);
+
+  const sqlCurrentSneaker = `
+  SELECT sneakers.*,
+  JSON_ARRAYAGG(JSON_OBJECT(
+      'size', sizes.size,
+      'id_size', sizes.id_size
+    )) AS sizes
+  FROM sneakers
+  inner join sizes
+  on sneakers.id_sneaker = sizes.id_sneaker
+  WHERE sneakers.slug = ?
+  GROUP BY 
+  sneakers.id_sneaker`;
+  const sqlImages = "SELECT url FROM images WHERE id_sneaker = ?";
+  const sqlRelatedSneakers = `
+    SELECT 
+      sneakers.*, 
+      ( 
+      SELECT GROUP_CONCAT(images.url) 
+      FROM images
+      WHERE images.id_sneaker = sneakers.id_sneaker
+      ) AS images,
+      ( 
+      SELECT JSON_ARRAYAGG(JSON_OBJECT(
+      'size', sizes.size,
+      'id_size', sizes.id_size
+    ))
+    FROM sizes 
+    WHERE sizes.id_sneaker = sneakers.id_sneaker
+    ) AS sizes
+    FROM sneakers
+    WHERE sneakers.brand = ? AND sneakers.slug != ?
+    GROUP BY
+      sneakers.id_sneaker
+    LIMIT 6;
+  `;
+
+  connection.query(sqlCurrentSneaker, [slug], (err, currentSneakerResults) => {
+    if (err)
+      return res.status(500).json({ error: "Errore nella query al database" });
+
+    if (currentSneakerResults.length === 0)
+      return res.status(404).json({ error: "Sneaker non trovata" });
+
+    const currentSneaker = currentSneakerResults[0];
+    const brand = currentSneaker.brand;
+    const idSneaker = currentSneaker.id_sneaker;
+
+    connection.query(sqlImages, [idSneaker], (err, imagesResults) => {
+      if (err)
+        return res
+          .status(500)
+          .json({ error: "Impossibile recuperare le immagini" });
+
+      connection.query(
+        sqlRelatedSneakers,
+        [brand, slug],
+        (err, relatedSneakersResults) => {
+          if (err)
+            return res
+              .status(500)
+              .json({ error: "Errore nella query al database" });
+
+          // ➕ Aggiunge ${process.env.APP_URL}/img/ a ogni URL delle correlate
+          const processedRelatedSneakers = relatedSneakersResults.map(
+            (sneaker) => {
+              const urls = sneaker.images
+                ? sneaker.images
+                  .split(",")
+                  .map((url) => `${process.env.APP_URL}/img/${url}`)
+                : [];
+
+              // Rimuovi campo originale se vuoi (opzionale)
+              delete sneaker.images;
+
+              return {
+                ...sneaker,
+                images: urls,
+              };
+            }
+          );
+
+          // ➕ Aggiunge ${process.env.APP_URL}/img/ anche alle immagini della sneaker corrente
+          const sneaker = {
+            ...currentSneaker,
+            images: imagesResults.map(
+              (img) => `${process.env.APP_URL}/img/${img.url}`
+            ),
+            related: processedRelatedSneakers,
+          };
+
+          res.json({ sneaker });
+        }
+      );
+    });
+  });
+};
+
+const postPopUp = (req, res) => {
+  const { name, surname, email } = req.body;
+
+  let errors = [];
+
+  if (!name) {
+    errors.push({ message: "controlla i dati immessi nel campo nome" });
   }
+  if (name.length < 2) {
+    errors.push({ message: `il nome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (name.length > 50) {
+    errors.push({ message: `il nome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (typeof name !== 'string') {
+    errors.push({ message: "Il campo nome deve essere una stringa" });
+  }
+
+  if (!surname) {
+    errors.push({ message: "controlla i dati immessi nel campo cognome" });
+  }
+  if (surname.length < 2) {
+    errors.push({ message: `il cognome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (surname.length > 50) {
+    errors.push({ message: `il cognome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (typeof surname !== 'string') {
+    errors.push({ message: "Il campo cognome deve essere una stringa" });
+  }
+
+  if (!email) {
+    errors.push({ message: "controlla i dati immessi nel campo e-mail" });
+  }
+  if (email.length < 2) {
+    errors.push({ message: `il e-mail non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (email.length > 50) {
+    errors.push({ message: `il e-mail non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (typeof email !== 'string') {
+    errors.push({ message: "Il campo e-mail deve essere una stringa" });
+  }
+  if (errors.length) {
+    return res.status(400).json(errors);
+  }
+
+  const testSubject = `Benvenuto in Boolshop ${name}!`;
+  const testText =
+    "Ciao! Questa è una email di test inviata con successo dal tuo server Node.js.";
+  const testHtml = `<h2>Ciao ${name} ${surname}!</h2>
+  <p>Questa è una email di benvenuto al nostro e-commerce</p>`;
+
+  const queryPopUp = `INSERT INTO data_popup (name,surname,email) VALUES(?, ?, ?)`;
+
+  connection.query(queryPopUp, [name, surname, email], (err, results) => {
+    if (err) return res.status(500).json({ message: "Errore del server", err });
+    res.status(201).json({ message: "Dati ricevuti correttamente" });
+    console.log(results);
+
+    sendEmail(email, testSubject, testText, testHtml, (error, info) => {
+      if (error) {
+        console.error("ERRORE durante l'invio dell'email di test:", error);
+      } else {
+        console.log("Email di test inviata con successo!");
+        console.log("MessageId:", info.messageId);
+      }
+    });
+  });
+};
+
+const postCheckOut = (req, res) => {
+  const { name, surname, address, phone, email, items } = req.body;
+
+  let errors = [];
+
+  if (!name) {
+    errors.push({ message: "controlla i dati immessi nel campo nome" });
+  }
+  if (name.length < 2) {
+    errors.push({ message: `il nome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (name.length > 50) {
+    errors.push({ message: `il nome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (typeof name !== 'string') {
+    errors.push({ message: "Il campo nome deve essere una stringa" });
+  }
+  if (surname.length < 2) {
+    errors.push({ message: `il cognome non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (surname.length > 50) {
+    errors.push({ message: `il cognome non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (typeof surname !== 'string') {
+    errors.push({ message: "Il campo cognome deve essere una stringa" });
+  }
+  if (!address)
+    errors.push({
+      message: "controlla i dati immessi nel campo dell'indirizzo",
+    });
+  if (address.length < 2) {
+    errors.push({ message: `L'indirizzo non può contenere meno di 2 caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (address.length > 100) {
+    errors.push({ message: `L'indirizzo non può contenere più di caratteri(numero attuale caratteri: ${name.length})` });
+  }
+  if (typeof address !== 'string') {
+    errors.push({ message: "Il campo dell'indirizzo deve essere una stringa" });
+  }
+  if (!phone)
+    errors.push({ message: "controlla i dati immessi nel campo numero di telefono" });
+  if (phone.length < 8)
+    errors.push({ message: `il numero di telefono non può contenere meno di 8 caratteri(numero attuale di caratteri: ${phone.length}` });
+  if (phone.length > 30)
+    errors.push({ message: `il numero di telefono non può contenere più di caratteri(numero attuale di caratteri: ${phone.length}` });
+  if (!/^\+?[0-9]+$/.test(phone)) {
+    errors.push({ message: "Il campo del numero di telefono può includere solo numeri" });
+  }
+  if (!email)
+    errors.push({ message: "controlla i dati immessi nel campo e-mail" });
+  if (email.length < 8)
+    errors.push({ message: `l'email non può contenere meno di 8 caratteri(numero attuale di caratteri: ${email.length}` });
+  if (email.length > 30)
+    errors.push({ message: `l'email non può contenere più di caratteri(numero attuale di caratteri: ${email.length}` });
+  if (!Array.isArray(items) || !items.length) {
+    errors.push({ message: "Il carrello è vuoto." });
+  }
+
+  if (errors.length) return res.status(400).json(errors);
+
+  const queryDataCheckout = `
+    INSERT INTO data_checkout (name, surname, address, phone, email)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+
+  connection.query(
+    queryDataCheckout,
+    [name, surname, address, phone, email],
+    (err, result) => {
+      if (err)
+        return res
+          .status(500)
+          .json({ message: "Errore salvataggio utente", err });
+
+      const id_data_checkout = result.insertId;
+      const sizeIds = items.map((item) => item.id_size);
+      const placeholders = sizeIds.map(() => "?").join(",");
+
+      const queryPrices = `
+      SELECT sizes.id_size, sneakers.id_sneaker, sneakers.price
+      FROM sizes
+      JOIN sneakers ON sizes.id_sneaker = sneakers.id_sneaker
+      WHERE sizes.id_size IN (${placeholders})
+    `;
+
+      connection.query(queryPrices, sizeIds, (err, priceResults) => {
+        if (err)
+          return res
+            .status(500)
+            .json({ message: "Errore recupero prezzi", err });
+
+        const sneakerMap = {};
+        const sizeToSneaker = {};
+
+        priceResults.forEach((row) => {
+          sizeToSneaker[row.id_size] = row.id_sneaker;
+          sneakerMap[row.id_sneaker] = row.price;
+        });
+
+        let total_price = parseInt(0);
+
+        items.forEach((item) => {
+          const id_sneaker = sizeToSneaker[item.id_size];
+          const itemPrice = sneakerMap[id_sneaker];
+          total_price += itemPrice * item.quantity;
+        });
+
+        const queryOrder = `
+        INSERT INTO orders (id_data_checkout, total_price)
+        VALUES (?, ?)
+      `;
+
+        connection.query(
+          queryOrder,
+          [id_data_checkout, total_price],
+          (err, result) => {
+            if (err)
+              return res
+                .status(500)
+                .json({ message: "Errore salvataggio ordine", err });
+
+            const id_order = result.insertId;
+            const orderItems = items.map((item) => [
+              item.id_size,
+              id_order,
+              item.quantity,
+            ]);
+
+            const queryOrderSize = `
+          INSERT INTO order_size (id_size, id_order, quantity)
+          VALUES ?
+        `;
+            // email lato e-commerce
+
+            const itemsHtml = items
+              .map(
+                (item) => `
+              <p>nome articolo: ${item.model}</p>
+              <p>taglia articolo: ${item.size}</p>
+              <p>quantità articolo: ${item.quantity}</p>
+              <p>prezzo articolo: ${item.price}</p>
+              <br/>`
+              )
+              .join("");
+            connection.query(queryOrderSize, [orderItems], (err) => {
+              if (err)
+                return res
+                  .status(500)
+                  .json({ message: "Errore salvataggio articoli", err });
+              const subject = "Conferma ordine - bool_shop";
+              const text = `Grazie per il tuo ordine, ${name} ${surname}!`;
+              const html = `
+            <h2>Ordine del cliente ${name} ${surname}</h2>
+              ${itemsHtml}
+            <p>Totale ordine: <strong>€${total_price.toFixed(2)}</strong></p> `;
+
+              // email per il cliente
+
+              sendEmail(process.env.EMAIL_USER, subject, text, html);
+
+              const userSubject = "Conferma ordine - bool_shop";
+              const userText = `Grazie per il tuo ordine, ${name} ${surname}!`;
+              const userHtml = `
+            <h2>Ciao ${name} ${surname},</h2>
+            <p>Grazie per il tuo ordine!</p>
+            <p> ${itemsHtml}</p>
+            <p>Totale ordine: <strong>€${total_price.toFixed(2)}</strong></p>`;
+              sendEmail(email, userSubject, userText, userHtml, () => {
+                return res.status(201).json({
+                  message: "Ordine completato con successo",
+                  id_order,
+                  total_price,
+                });
+              });
+            });
+          }
+        );
+      });
+    }
+  );
 };
 
 module.exports = {
@@ -875,5 +596,284 @@ module.exports = {
   indexCheapest,
   show,
   postPopUp,
+  postCheckOut,
 };
+
+// ! --------------------------------------------------------------------------------------
+
+// const pool = require("../data/db.js"); // ora è il pool
+// const { sendEmail } = require("../services/emailService.js");
+
+// // INDEX TUTTE LE SCARPE
+// const indexAll = async (req, res) => {
+//   try {
+//     const searchParam = req.query.search;
+//     const orderNameParam = req.query.name;
+//     const orderPriceParam = req.query.price;
+//     const orderDateParam = req.query.date;
+
+//     const defaultQuery = `
+//       SELECT DISTINCT sneakers.*,
+//       (
+//         SELECT JSON_ARRAYAGG(JSON_OBJECT(
+//           'size', sizes.size,
+//           'id_size', sizes.id_size
+//         ))
+//         FROM sizes 
+//         WHERE sizes.id_sneaker = sneakers.id_sneaker
+//       ) AS sizes,
+//       (
+//         SELECT GROUP_CONCAT(images.url)  
+//         FROM images
+//         WHERE images.id_sneaker = sneakers.id_sneaker
+//       ) AS images
+//       FROM sneakers
+//     `;
+
+//     let querySearch = defaultQuery;
+//     let queryParams = [];
+
+//     if (searchParam) {
+//       const search = `%${searchParam}%`;
+//       querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?`;
+//       queryParams = [search, search];
+//     }
+
+//     if (orderNameParam) {
+//       if (searchParam) {
+//         const search = `%${searchParam}%`;
+//         querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
+//         ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
+//         queryParams = [search, search];
+//       } else {
+//         querySearch = `${defaultQuery} ORDER BY sneakers.brand ${orderNameParam}, sneakers.model ${orderNameParam}`;
+//       }
+//     } else if (orderPriceParam) {
+//       if (searchParam) {
+//         const search = `%${searchParam}%`;
+//         querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
+//         ORDER BY sneakers.price ${orderPriceParam}`;
+//         queryParams = [search, search];
+//       } else {
+//         querySearch = `${defaultQuery} ORDER BY sneakers.price ${orderPriceParam}`;
+//       }
+//     } else if (orderDateParam) {
+//       if (searchParam) {
+//         const search = `%${searchParam}%`;
+//         querySearch = `${defaultQuery} WHERE brand LIKE ? OR model LIKE ?
+//         ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
+//         queryParams = [search, search];
+//       } else {
+//         querySearch = `${defaultQuery} ORDER BY sneakers.date_of_arrival ${orderDateParam}`;
+//       }
+//     }
+
+//     const [results] = await pool.query(querySearch, queryParams);
+
+//     const sneakersWithUrls = results.map((sneaker) => ({
+//       ...sneaker,
+//       images: sneaker.images
+//         ? sneaker.images.split(",").map((img) => `${process.env.APP_URL}/img/${img}`)
+//         : [],
+//     }));
+
+//     res.json(sneakersWithUrls);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Database query failed" });
+//   }
+// };
+
+// // INDEX ULTIMI 5 ARRIVI
+// const indexLatest = async (req, res) => {
+//   try {
+//     const sqlLatestSneaker = ` 
+//       SELECT DISTINCT sneakers.*,
+//       (
+//         SELECT JSON_ARRAYAGG(JSON_OBJECT(
+//           'size', sizes.size,
+//           'id_size', sizes.id_size
+//         ))
+//         FROM sizes 
+//         WHERE sizes.id_sneaker = sneakers.id_sneaker
+//       ) AS sizes,
+//       (
+//         SELECT GROUP_CONCAT(images.url)  
+//         FROM images
+//         WHERE images.id_sneaker = sneakers.id_sneaker
+//       ) AS images
+//       FROM sneakers
+//       ORDER BY sneakers.date_of_arrival DESC 
+//       LIMIT 6;
+//     `;
+//     const [results] = await pool.query(sqlLatestSneaker);
+
+//     const sneakersWithImages = results.map((sneaker) => ({
+//       ...sneaker,
+//       images: sneaker.images
+//         ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
+//         : [],
+//     }));
+
+//     res.json({ results: sneakersWithImages });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Errore nella query al database" });
+//   }
+// };
+
+// // SHOW ULTIMO ARRIVO PER LA HERO
+// const latestForHero = async (req, res) => {
+//   try {
+//     const sqlLatestSneakerForHero = `
+//       SELECT s.*, GROUP_CONCAT(i.url ORDER BY i.id_image ASC) AS images
+//       FROM sneakers s
+//       JOIN images i ON s.id_sneaker = i.id_sneaker
+//       GROUP BY s.id_sneaker
+//       ORDER BY s.date_of_arrival DESC
+//       LIMIT 1;
+//     `;
+//     const [results] = await pool.query(sqlLatestSneakerForHero);
+
+//     const sneakerWithImages = results.map((sneaker) => ({
+//       ...sneaker,
+//       images: sneaker.images
+//         ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
+//         : [],
+//     }));
+
+//     res.json({ results: sneakerWithImages });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Errore nella query al database" });
+//   }
+// };
+
+// // INDEX 5 SCARPE ECONOMICHE
+// const indexCheapest = async (req, res) => {
+//   try {
+//     const sqlCheapestSneaker = `
+//       SELECT DISTINCT sneakers.*,
+//       (
+//         SELECT JSON_ARRAYAGG(JSON_OBJECT(
+//           'size', sizes.size,
+//           'id_size', sizes.id_size
+//         ))
+//         FROM sizes 
+//         WHERE sizes.id_sneaker = sneakers.id_sneaker
+//       ) AS sizes,
+//       (
+//         SELECT GROUP_CONCAT(images.url)  
+//         FROM images
+//         WHERE images.id_sneaker = sneakers.id_sneaker
+//       ) AS images
+//       FROM sneakers
+//       ORDER BY sneakers.price ASC
+//       LIMIT 6;
+//     `;
+//     const [results] = await pool.query(sqlCheapestSneaker);
+
+//     const sneakersWithImages = results.map((sneaker) => ({
+//       ...sneaker,
+//       images: sneaker.images
+//         ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url.trim()}`)
+//         : [],
+//     }));
+
+//     res.json({ results: sneakersWithImages });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Errore nella query al database" });
+//   }
+// };
+
+// // SHOW SINGOLA SNEAKER
+// const show = async (req, res) => {
+//   const conn = await pool.getConnection();
+//   try {
+//     const slug = decodeURIComponent(req.params.slug);
+
+//     const sqlCurrentSneaker = `
+//       SELECT sneakers.*,
+//       JSON_ARRAYAGG(JSON_OBJECT(
+//         'size', sizes.size,
+//         'id_size', sizes.id_size
+//       )) AS sizes
+//       FROM sneakers
+//       INNER JOIN sizes ON sneakers.id_sneaker = sizes.id_sneaker
+//       WHERE sneakers.slug = ?
+//       GROUP BY sneakers.id_sneaker
+//     `;
+//     const sqlImages = "SELECT url FROM images WHERE id_sneaker = ?";
+//     const sqlRelatedSneakers = `
+//       SELECT sneakers.*,
+//       (SELECT GROUP_CONCAT(images.url) FROM images WHERE images.id_sneaker = sneakers.id_sneaker) AS images,
+//       (SELECT JSON_ARRAYAGG(JSON_OBJECT('size', sizes.size,'id_size', sizes.id_size)) FROM sizes WHERE sizes.id_sneaker = sneakers.id_sneaker) AS sizes
+//       FROM sneakers
+//       WHERE sneakers.brand = ? AND sneakers.slug != ?
+//       GROUP BY sneakers.id_sneaker
+//       LIMIT 6;
+//     `;
+
+//     const [currentSneakerResults] = await conn.query(sqlCurrentSneaker, [slug]);
+//     if (!currentSneakerResults.length) return res.status(404).json({ error: "Sneaker non trovata" });
+
+//     const currentSneaker = currentSneakerResults[0];
+//     const [imagesResults] = await conn.query(sqlImages, [currentSneaker.id_sneaker]);
+//     const [relatedSneakersResults] = await conn.query(sqlRelatedSneakers, [currentSneaker.brand, slug]);
+
+//     const processedRelatedSneakers = relatedSneakersResults.map((sneaker) => {
+//       const urls = sneaker.images ? sneaker.images.split(",").map((url) => `${process.env.APP_URL}/img/${url}`) : [];
+//       delete sneaker.images;
+//       return { ...sneaker, images: urls };
+//     });
+
+//     const sneaker = {
+//       ...currentSneaker,
+//       images: imagesResults.map((i) => `${process.env.APP_URL}/img/${i.url}`),
+//       related: processedRelatedSneakers,
+//     };
+
+//     res.json({ sneaker });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Errore nella query al database" });
+//   } finally {
+//     conn.release();
+//   }
+// };
+
+// // POST POPUP (stessa logica, solo pool)
+// const postPopUp = async (req, res) => {
+//   try {
+//     const { name, surname, email } = req.body;
+//     let errors = [];
+
+//     if (!name || typeof name !== "string" || name.length < 2 || name.length > 50)
+//       errors.push({ message: "Errore sul campo nome" });
+//     if (!surname || typeof surname !== "string" || surname.length < 2 || surname.length > 50)
+//       errors.push({ message: "Errore sul campo cognome" });
+//     if (!email || typeof email !== "string" || email.length < 2 || email.length > 50)
+//       errors.push({ message: "Errore sul campo email" });
+//     if (errors.length) return res.status(400).json(errors);
+
+//     const queryPopUp = `INSERT INTO data_popup (name,surname,email) VALUES(?, ?, ?)`;
+//     await pool.query(queryPopUp, [name, surname, email]);
+//     res.status(201).json({ message: "Dati ricevuti correttamente" });
+
+//     sendEmail(email, `Benvenuto in Boolshop ${name}!`, "Test", `<h2>Ciao ${name} ${surname}!</h2>`);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Errore server popup" });
+//   }
+// };
+
+// module.exports = {
+//   indexAll,
+//   indexLatest,
+//   latestForHero,
+//   indexCheapest,
+//   show,
+//   postPopUp,
+// };
 
