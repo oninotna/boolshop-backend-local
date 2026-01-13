@@ -1,4 +1,4 @@
-const connection = require("../data/db.js");
+const pool = require("../data/db.js");
 const { sendEmail } = require("../services/emailService.js");
 
 // INDEX TUTTE LE SCARPE
@@ -72,22 +72,31 @@ const indexAll = (req, res) => {
     }
   }
 
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error("Errore di connessione al database:", err);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
 
-  connection.query(querySearch, queryParams, (err, results) => {
-    if (err) return res.status(500).json({ error: "Database query failed" });
+    connection.query(querySearch, queryParams, (err, results) => {
+      if (err) return res.status(500).json({ error: "Database query failed" });
+  
+      const sneakersWithImages = results.map((sneaker) => ({
+        ...sneaker,
+        images: sneaker.images ? sneaker.images.split(",") : [],
+      }));
+  
+      const sneakersWithUrls = sneakersWithImages.map((sneaker) => ({
+        ...sneaker,
+        images: sneaker.images.map((img) => `${process.env.APP_URL}/img/${img}`),
+      }));
+  
+      res.json(sneakersWithUrls);
+    });
 
-    const sneakersWithImages = results.map((sneaker) => ({
-      ...sneaker,
-      images: sneaker.images ? sneaker.images.split(",") : [],
-    }));
-
-    const sneakersWithUrls = sneakersWithImages.map((sneaker) => ({
-      ...sneaker,
-      images: sneaker.images.map((img) => `${process.env.APP_URL}/img/${img}`),
-    }));
-
-    res.json(sneakersWithUrls);
+    connection.release();
   });
+
 };
 
 // INDEX ULTIMI 5 ARRIVI
@@ -112,6 +121,13 @@ const indexLatest = (req, res) => {
     ORDER BY 
       sneakers.date_of_arrival DESC 
     LIMIT 6;`;
+
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error("Errore di connessione al database:", err);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
+
   connection.query(sqlLatestSneaker, (err, results) => {
     if (err) {
       console.error("Errore nella query al database:", err); // Logga l'errore per il debugging
@@ -134,6 +150,9 @@ const indexLatest = (req, res) => {
       results: sneakersWithImages,
     });
   });
+  
+  connection.release();
+  });
 };
 // SHOW ULTIMO ARRIVO PER LA HERO
 
@@ -152,6 +171,12 @@ const latestForHero = (req, res) => {
       s.date_of_arrival DESC 
     LIMIT 1;
   `;
+
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error("Errore di connessione al database:", err);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
 
   connection.query(sqlLatestSneakerForHero, (err, results) => {
     if (err) {
@@ -173,6 +198,9 @@ const latestForHero = (req, res) => {
     res.json({
       results: sneakerWithImages,
     });
+  });
+
+  connection.release();
   });
 };
 
@@ -198,6 +226,12 @@ const indexCheapest = (req, res) => {
     ORDER BY sneakers.price ASC
     LIMIT 6;
   `;
+
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error("Errore di connessione al database:", err);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
 
   connection.query(sqlCheapestSneaker, (err, results) => {
     if (err) {
@@ -235,7 +269,11 @@ const indexCheapest = (req, res) => {
       results: sneakersWithImages,
     });
   });
+
+  connection.release();
+  });
 };
+
 const show = (req, res) => {
   const slug = decodeURIComponent(req.params.slug);
 
@@ -274,6 +312,12 @@ const show = (req, res) => {
       sneakers.id_sneaker
     LIMIT 6;
   `;
+
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error("Errore di connessione al database:", err);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
 
   connection.query(sqlCurrentSneaker, [slug], (err, currentSneakerResults) => {
     if (err)
@@ -334,6 +378,10 @@ const show = (req, res) => {
       );
     });
   });
+
+  connection.release();
+  });
+
 };
 
 const postPopUp = (req, res) => {
@@ -391,6 +439,12 @@ const postPopUp = (req, res) => {
 
   const queryPopUp = `INSERT INTO data_popup (name,surname,email) VALUES(?, ?, ?)`;
 
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error("Errore di connessione al database:", err);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
+
   connection.query(queryPopUp, [name, surname, email], (err, results) => {
     if (err) return res.status(500).json({ message: "Errore del server", err });
     res.status(201).json({ message: "Dati ricevuti correttamente" });
@@ -404,6 +458,9 @@ const postPopUp = (req, res) => {
         console.log("MessageId:", info.messageId);
       }
     });
+  });
+
+  connection.release();
   });
 };
 
@@ -471,6 +528,12 @@ const postCheckOut = (req, res) => {
     INSERT INTO data_checkout (name, surname, address, phone, email)
     VALUES (?, ?, ?, ?, ?)
   `;
+
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error("Errore di connessione al database:", err);
+      return res.status(500).json({ error: "Database connection failed" });
+    }
 
   connection.query(
     queryDataCheckout,
@@ -587,6 +650,9 @@ const postCheckOut = (req, res) => {
       });
     }
   );
+
+  connection.release();
+  });
 };
 
 module.exports = {
